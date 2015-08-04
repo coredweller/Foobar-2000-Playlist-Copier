@@ -9,19 +9,25 @@ namespace Foobar2000PlaylistCopier
 {
     public class Program
     {
-        private static readonly Regex ParseFileNamesRegex = new Regex( "(file:)+((.*?)(mp3|flac))" );
+        //Used for phish and worked perfectly
+        //private static readonly Regex ParseFileNamesRegex = new Regex( "(file:)+((.*?)(mp3|flac))" );
+
+        //Used for jauntee and gets 120/132
+        private static readonly Regex ParseFileNamesRegex = new Regex( "(file:)+((.*?)(flac.*?(mp3|flac)))" );
+        
         private static readonly Regex ParseSongNameRegex = new Regex( @"(\\)+(?:.(?!\\))+$" );
 
         static void Main( string[] args ) {
-
-            var fileName = "C:\\Users\\Dan\\Music\\Playlists\\Heater Phish - Copy.fpl";
-            var destination = @"C:\Users\Dan\Music\Playlists\destination\";
+            ///IMPORTANT: Make sure to always make a copy of the playlist.  It might destroys the playlist file!
+            var fileName = "C:\\Users\\Dan\\Music\\Playlists\\Heater Jauntee - Copy.fpl";
+            var destination = @"C:\Users\Dan\Music\Playlists\Heater Jauntee 8_3_15\";
+            var success = true;
 
             //Get all file names from the file
             var fileNames = GetFileNames( fileName );
             if ( fileNames == null ) {
                 Console.WriteLine( "File Names are null, exiting out" );
-                Environment.Exit( 0 );
+                success = false;
             }
 
             //Check to make sure that they all exist and can be found
@@ -33,12 +39,14 @@ namespace Foobar2000PlaylistCopier
                     Console.WriteLine( dontExist );
                 }
 
-                Environment.Exit( 0 );
+                success = false;
             }
-
+            
             //Copy files from source location to new destination
-            var success = CopyFiles( fileNames, destination );
+            success = success ? CopyFiles( fileNames, destination ) : false;
 
+            Console.WriteLine();
+            Console.WriteLine( "Finished Copying files" );
             Console.ReadKey();
             Environment.Exit( success ? 1 : 0 );
         }
@@ -62,7 +70,9 @@ namespace Foobar2000PlaylistCopier
                             finalDestination = destination + name;
                         }
 
+                        Console.WriteLine( "About to copy: " + finalDestination );
                         File.Copy( file, finalDestination);
+                        Console.WriteLine( "Successfully copied: " + finalDestination );
                     }
                     else {
                         Console.WriteLine( "File did not get copied: " + file );
