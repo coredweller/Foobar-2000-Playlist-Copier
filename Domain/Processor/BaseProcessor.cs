@@ -16,7 +16,7 @@ namespace Domain.Processor
     public abstract class BaseProcessor : IProcess
     {
         private readonly ProcessorContext _context;
-        private IEnumerable<string> _fileNames;
+        private IList<string> _fileNames;
 
         public BaseProcessor( ProcessorContext context ) {
             _context = context;
@@ -40,14 +40,16 @@ namespace Domain.Processor
             return CheckFileStatus() ? CopyFiles( _fileNames, _context.Destination ) : false;
         }
 
-        private bool CheckFileStatus( ) {
+        private bool CheckFileStatus() {
 
             //Get all file names from the file
-            _fileNames = GetFileNames( _context.FileName );
-            if ( _fileNames == null ) {
+            _fileNames = GetFileNames( _context.FileName ).ToList();
+            if ( _fileNames == null || !_fileNames.Any() ) {
                 Console.WriteLine( "File Names are null, exiting out" );
                 return false;
             }
+
+            Console.WriteLine("File Names Found: {0}", _fileNames.Count());
 
             //Check to make sure that they all exist and can be found
             var filesThatDontExist = DoAllFilesExist( _fileNames );
@@ -56,39 +58,58 @@ namespace Domain.Processor
 
                 foreach ( var dontExist in filesThatDontExist ) {
                     Console.WriteLine( dontExist + "\r\n" );
+                    _fileNames.Remove(dontExist);
                 }
 
                 return AllowedToProceedIfFilesMissing;
             }
+
+            Console.WriteLine( "Files that exist: {0}", _fileNames.Count() );
 
             return true;
         }
 
         //Copy files from source location to new destination
         private bool CopyFiles( IEnumerable<string> fileNames, string destination ) {
+            var successfulCount = 0;
             try {
-
-                var count = 0;
                 foreach ( var file in fileNames ) {
-                    count++;
-                    Match match = ParseSongNameRegex.Match( file );
-                    if ( match.Success ) {
-                        var name = match.ToString().Remove( 0, 1 );
-                        var finalDestination = destination + name;
+                    
+                    try {
+                        Match match = ParseSongNameRegex.Match( file );
+                        if ( match.Success ) {
+                            var name = match.ToString().Remove( 0, 1 );
+                            var finalDestination = destination + name;
 
-                        if ( File.Exists( finalDestination ) && RenameDuplicateFileNames ) {
-                            Random r = new Random();
-                            var randomNumber = r.Next( 2, 1000 );
-                            name = randomNumber + name;
-                            finalDestination = destination + name;
+                            var exists = false;
+                            if ( File.Exists( finalDestination ) ) {
+                                if ( RenameDuplicateFileNames ) {
+                                    Random r = new Random();
+                                    var randomNumber = r.Next( 2, 1000 );
+                                    name = randomNumber + name;
+                                    finalDestination = destination + name;
+                                }
+                                exists = true;
+                            }
+
+                            if ( !exists || ( exists && RenameDuplicateFileNames ) ) {
+                                Console.WriteLine( "About to copy: " + finalDestination );
+                                File.Copy( file, finalDestination );
+                                Console.WriteLine( "Successfully copied: " + finalDestination );
+                            }
+                            else {
+                                Console.WriteLine( "We will not copy {0} because it exists and this processor type does not allow renaming of duplicate file names", file );
+                            }
+
+                            successfulCount++;
                         }
-
-                        Console.WriteLine( "About to copy: " + finalDestination );
-                        File.Copy( file, finalDestination );
-                        Console.WriteLine( "Successfully copied: " + finalDestination );
+                        else {
+                            Console.WriteLine( "File did not get copied: " + file );
+                        }
                     }
-                    else {
-                        Console.WriteLine( "File did not get copied: " + file );
+                    catch(ArgumentException ae)
+                    {
+                        Console.WriteLine( "Exception copying file {0} for reason {1}", file, ae.Message );
                     }
                 }
 
@@ -96,6 +117,7 @@ namespace Domain.Processor
             }
             catch ( Exception ex ) {
                 Console.WriteLine( "EXCEPTION OCCURRED in CopyFiles: " + ex.Message );
+                Console.WriteLine( "We made it through {0} out of {1} successfully before it failed", successfulCount, fileNames.Count() );
                 return false;
             }
         }
