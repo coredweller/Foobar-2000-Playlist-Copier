@@ -14,41 +14,50 @@ namespace Foobar2000PlaylistCopier
 
         //Used for jauntee and gets 120/132
         private static readonly Regex ParseFileNamesRegex = new Regex( "(file:)+((.*?)(flac.*?(mp3|flac)))" );
-        
+
+        //Could create different classes based on this and include the regexes in them.  Like JaunteeProcessor or PhishProcessor
+        private static readonly bool RenameDuplicateFileNames = true;
+        private static readonly bool AllowedToProceedIfFilesMissing = false;
+
         private static readonly Regex ParseSongNameRegex = new Regex( @"(\\)+(?:.(?!\\))+$" );
 
-        static void Main( string[] args ) {
-            ///IMPORTANT: Make sure to always make a copy of the playlist.  It might destroys the playlist file!
+        private static IEnumerable<string> _fileNames;
+
+        public static void Main( string[] args ) {
+            ///IMPORTANT: Make sure to always make a copy of the playlist.  It might destroy the playlist file!
             var fileName = "C:\\Users\\Dan\\Music\\Playlists\\Heater Jauntee - Copy.fpl";
             var destination = @"C:\Users\Dan\Music\Playlists\Heater Jauntee 8_3_15\";
-            var success = true;
+
+            //Copy files from source location to new destination
+            var success = CheckFileStatus( fileName, destination ) ? CopyFiles( _fileNames, destination ) : false;
+
+            Console.WriteLine( "\r\n Finished Processing.  Press a key to proceed." );
+            Console.ReadKey();
+            Environment.Exit( success ? 1 : 0 );
+        }
+
+        private static bool CheckFileStatus( string fileName, string destination ) {
 
             //Get all file names from the file
-            var fileNames = GetFileNames( fileName );
-            if ( fileNames == null ) {
+            _fileNames = GetFileNames( fileName );
+            if ( _fileNames == null ) {
                 Console.WriteLine( "File Names are null, exiting out" );
-                success = false;
+                return false;
             }
 
             //Check to make sure that they all exist and can be found
-            var filesThatDontExist = DoAllFilesExist( fileNames );
+            var filesThatDontExist = DoAllFilesExist( _fileNames );
             if ( filesThatDontExist != null && filesThatDontExist.Any() ) {
                 Console.WriteLine( "Files that were not found: " );
 
                 foreach ( var dontExist in filesThatDontExist ) {
-                    Console.WriteLine( dontExist );
+                    Console.WriteLine( dontExist + "\r\n" );
                 }
 
-                success = false;
+                return AllowedToProceedIfFilesMissing;
             }
-            
-            //Copy files from source location to new destination
-            success = success ? CopyFiles( fileNames, destination ) : false;
 
-            Console.WriteLine();
-            Console.WriteLine( "Finished Copying files" );
-            Console.ReadKey();
-            Environment.Exit( success ? 1 : 0 );
+            return true;
         }
 
         //Copy files from source location to new destination
@@ -63,7 +72,7 @@ namespace Foobar2000PlaylistCopier
                         var name = match.ToString().Remove( 0, 1 );
                         var finalDestination = destination + name;
 
-                        if ( File.Exists( finalDestination ) ) {
+                        if ( File.Exists( finalDestination ) && RenameDuplicateFileNames ) {
                             Random r = new Random();
                             var randomNumber = r.Next( 2, 1000 );
                             name = randomNumber + name;
@@ -71,7 +80,7 @@ namespace Foobar2000PlaylistCopier
                         }
 
                         Console.WriteLine( "About to copy: " + finalDestination );
-                        File.Copy( file, finalDestination);
+                        File.Copy( file, finalDestination );
                         Console.WriteLine( "Successfully copied: " + finalDestination );
                     }
                     else {
